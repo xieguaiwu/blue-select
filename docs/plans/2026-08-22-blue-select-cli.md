@@ -10,6 +10,8 @@
 
 **Spec:** `~/prompt_boilerplates/System_Fix/bluetooth-pairing-troubleshoot.md`（v1.2.0，命令来源）+ 本文件「实测事实」节（2026-08-22 本机验证记录）。
 
+> **执行状态（2026-08-22 晚）**：Task 1-8 已全部实施并提交，已部署 `~/.local/bin/blue-select`，systemd 服务 active。以下步骤因耳机不在场**⏸ 待真机验证**：Task 4 Step 5（connect 冒烟）、Task 6 Step 2（watch 断连重连）、Task 7 Step 2 中耳机断开重连部分、Task 8 Step 3 中 connect/get-default-sink 两项。真机不符修复：sinks short 为 5 列；ParseActiveProfile 匹配 bluez_card 需 MAC 冒号换下划线。详见 CONTEXT_FOR_NEXT_AGENT.md。
+
 ## 实测事实（执行者必读，2026-08-22 本机验证）
 
 | 事实 | 值 |
