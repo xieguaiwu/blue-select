@@ -2,9 +2,11 @@
 package main
 
 import (
-	"errors"
+	"bufio"
 	"fmt"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -205,5 +207,98 @@ func runStatus() error {
 	}
 	return nil
 }
-func runWatch() error   { return errors.New("watch: not implemented") }
-func runInstall() error { return errors.New("install: not implemented") }
+func runWatch() error {
+	cmd := exec.Command("pactl", "subscribe")
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return err
+	}
+	if err := cmd.Start(); err != nil {
+		return fmt.Errorf("启动 pactl subscribe: %w", err)
+	}
+	defer cmd.Process.Kill()
+	logf := func(format string, a ...any) {
+		fmt.Printf("%s %s\n", time.Now().Format("2006-01-02 15:04:05"), fmt.Sprintf(format, a...))
+	}
+	logf("watch 启动，监听音频事件...")
+
+	scanner := bufio.NewScanner(stdout)
+	for scanner.Scan() {
+		line := scanner.Text()
+		// 只关心 sink 事件；change 也处理——sink 状态翻转时默认输出可能被系统改走
+		if !strings.Contains(line, "on sink") {
+			continue
+		}
+		time.Sleep(300 * time.Millisecond) // 防抖：等 sink 注册完成
+		s, ok := audio.BluezSink()
+		if !ok {
+			continue // 蓝牙 sink 消失（耳机断开），不动作
+		}
+		cur, err := audio.Default()
+		if err == nil && cur == s.Name {
+			continue // 已经是默认
+		}
+		if err := audio.SetDefault(s.Name); err != nil {
+			logf("错误: 设默认失败: %v", err)
+			continue
+		}
+		moved, _ := audio.MoveAllStreams(s.Name)
+		logf("已切换默认输出到 %s（迁移 %d 个播放流）", s.Name, moved)
+	}
+	return scanner.Err()
+}
+
+const unitTemplate = `[Unit]
+Description=blue-select watch: 蓝牙 sink 自动切换
+After=pipewire.service wireplumber.service
+
+[Service]
+ExecStart=%s watch
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=default.target
+`
+
+func runInstall() error {
+	bin, err := os.Executable()
+	if err != nil {
+		return err
+	}
+	bin, err = filepath.EvalSymlinks(bin)
+	if err != nil {
+		return err
+	}
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return err
+	}
+	unitDir := filepath.Join(home, ".config", "systemd", "user")
+	if err := os.MkdirAll(unitDir, 0o755); err != nil {
+		return err
+	}
+	unitPath := filepath.Join(unitDir, "blue-select-watch.service")
+	unit := fmt.Sprintf(unitTemplate, bin)
+	if err := os.WriteFile(unitPath, []byte(unit), 0o644); err != nil {
+		return err
+	}
+	fmt.Println("已写入", unitPath)
+	for _, args := range [][]string{
+		{"--user", "daemon-reload"},
+		{"--user", "enable", "--now", "blue-select-watch.service"},
+	} {
+		if out, err := exec.Command("systemctl", args...).CombinedOutput(); err != nil {
+			return fmt.Errorf("systemctl %s: %w: %s", strings.Join(args, " "), err, strings.TrimSpace(string(out)))
+		}
+	}
+	// 验证
+	out, err := exec.Command("systemctl", "--user", "is-active", "blue-select-watch.service").Output()
+	state := strings.TrimSpace(string(out))
+	if err != nil || state != "active" {
+		return fmt.Errorf("服务未 active（当前: %s），用 journalctl --user -u blue-select-watch 查日志", state)
+	}
+	fmt.Println("✓ blue-select-watch 服务已启用并运行（active）")
+	fmt.Println("  日志: journalctl --user -u blue-select-watch -f")
+	return nil
+}
