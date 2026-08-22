@@ -1,0 +1,7 @@
+# 构建产物
+blue-select
+/blue-select
+*.test
+
+# 本地临时文件
+*.log
