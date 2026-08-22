@@ -153,8 +153,57 @@ func runConnect(name string) error {
 	return nil
 }
 
-// 以下为桩实现，Task 5-7 逐个替换。
+func runStatus() error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	devs, err := bluetooth.ListDevices()
+	if err != nil {
+		return err
+	}
+	fmt.Println("== 蓝牙设备 ==")
+	for _, d := range devs {
+		info, err := bluetooth.Info_(d.MAC)
+		if err != nil {
+			continue
+		}
+		if !info.Paired && !info.Connected {
+			continue // 只显示有意义的设备
+		}
+		state := "未连接"
+		if info.Connected {
+			state = "已连接"
+		}
+		line := fmt.Sprintf("  %s [%s]", d.Name, state)
+		if info.HasBattery && info.Connected {
+			line += fmt.Sprintf("  电量 %d%%", info.Battery)
+		}
+		if d.Name == cfg.DefaultDevice {
+			line += "  (默认)"
+		}
+		fmt.Println(line)
+		if info.Connected {
+			if p, err := audio.ActiveProfile(d.MAC); err == nil {
+				fmt.Printf("    profile: %s\n", p)
+			}
+		}
+	}
 
-func runStatus() error  { return errors.New("status: not implemented") }
+	fmt.Println("== 音频输出 ==")
+	def, _ := audio.Default()
+	sinks, err := audio.Sinks()
+	if err != nil {
+		return err
+	}
+	for _, s := range sinks {
+		marker := " "
+		if s.Name == def {
+			marker = "*"
+		}
+		fmt.Printf(" %s [%s] %s (%s)\n", marker, s.ID, s.Name, s.State)
+	}
+	return nil
+}
 func runWatch() error   { return errors.New("watch: not implemented") }
 func runInstall() error { return errors.New("install: not implemented") }
