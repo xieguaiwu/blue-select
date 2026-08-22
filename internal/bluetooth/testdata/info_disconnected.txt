@@ -1,0 +1,7 @@
+Device 30:96:10:FD:B6:88 (public)
+	Name: HUAWEI FreeArc
+	Paired: yes
+	Trusted: yes
+	Blocked: no
+	Connected: no
+	Modalias: bluetooth:v02B0p0000d001F
