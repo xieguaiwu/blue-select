@@ -1,0 +1,1 @@
+3149	49	3148	PipeWire	float32le 2ch 44100Hz

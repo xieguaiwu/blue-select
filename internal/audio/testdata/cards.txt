@@ -1,0 +1,7 @@
+Card #0
+	Name: alsa_card.pci-0000_00_1f.3
+	Active Profile: output:analog-stereo+input:analog-stereo
+
+Card #3239
+	Name: bluez_card.30_96_10_FD_B6_88
+	Active Profile: a2dp-sink
