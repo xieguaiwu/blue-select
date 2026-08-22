@@ -1,6 +1,6 @@
 # blue-select
 
-**English** | 简体中文
+**English** | [中文](README_zh.md)
 
 Bluetooth headphone one-shot connect & audio switch for Linux (bluez + PipeWire/PulseAudio). Written in Go, zero third-party dependencies.
 
@@ -32,7 +32,7 @@ First successful `connect <name>` records the device and makes it the default (`
 ```json
 {
   "default_device": "HUAWEI FreeArc",
-  "devices": { "HUAWEI FreeArc": "30:96:10:FD:B6:88" }
+  "devices": { "HUAWEI FreeArc": "AA:BB:CC:DD:EE:FF" }
 }
 ```
 
@@ -63,4 +63,4 @@ go test ./...
 
 ## License
 
-MIT
+[MIT](LICENSE)
