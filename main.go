@@ -28,6 +28,12 @@ func main() {
 			name = os.Args[2]
 		}
 		err = runConnect(name)
+	case "disconnect":
+		name := ""
+		if len(os.Args) > 2 {
+			name = os.Args[2]
+		}
+		err = runDisconnect(name)
 	case "status":
 		err = runStatus()
 	case "watch":
@@ -50,10 +56,11 @@ func usage() {
 	fmt.Fprint(os.Stdout, `blue-select — 蓝牙耳机一键连接与音频切换
 
 用法:
-  blue-select connect [设备名]   连接设备并切换音频输出（无参用默认设备）
-  blue-select status             显示连接、电量、profile、输出状态
-  blue-select watch              监听新蓝牙 sink，自动设默认并迁移播放流
-  blue-select install            安装并启用 watch 的 systemd user 服务
+  blue-select connect [设备名]      连接设备并切换音频输出（无参用默认设备）
+  blue-select disconnect [设备名]   断开设备，默认输出切回本地（无参用默认设备）
+  blue-select status               显示连接、电量、profile、输出状态
+  blue-select watch                监听新蓝牙 sink，自动设默认并迁移播放流
+  blue-select install              安装并启用 watch 的 systemd user 服务
 `)
 }
 
@@ -153,6 +160,78 @@ func runConnect(name string) error {
 		fmt.Printf("  电量: %d%%\n", info.Battery)
 	}
 	return nil
+}
+
+// runDisconnect 断开设备。若默认输出是该设备的 bluez sink，先把音频迁到回退 sink，
+// 再执行 bluetoothctl disconnect，避免播放流卡在即将消失的 sink 上。
+func runDisconnect(name string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	devs, err := bluetooth.ListDevices()
+	if err != nil {
+		return err
+	}
+	mac, err := ResolveDevice(cfg, name, devs)
+	if err != nil {
+		return err
+	}
+	devName := name
+	for _, d := range devs {
+		if d.MAC == mac {
+			devName = d.Name
+		}
+	}
+
+	info, err := bluetooth.Info_(mac)
+	if err != nil {
+		return err
+	}
+	if !info.Connected {
+		fmt.Printf("%s 未连接\n", devName)
+		return nil
+	}
+
+	if switched, err := switchAwayFrom(mac); err != nil {
+		fmt.Fprintln(os.Stderr, "警告: 音频切换失败:", err)
+	} else if switched {
+		fmt.Println("  音频已切走，断开中...")
+	}
+
+	fmt.Printf("断开 %s (%s)...\n", devName, mac)
+	if err := bluetooth.Disconnect(mac); err != nil {
+		return err
+	}
+	fmt.Printf("✓ %s 已断开\n", devName)
+	return nil
+}
+
+// switchAwayFrom 把默认输出从指定设备的 bluez sink 迁到回退 sink。
+// 返回 true 表示发生了切换；未切换不报错。
+func switchAwayFrom(mac string) (bool, error) {
+	prefix := audio.BluezSinkPrefix(mac)
+	def, err := audio.Default()
+	if err != nil {
+		return false, err
+	}
+	if !strings.HasPrefix(def, prefix) {
+		return false, nil
+	}
+	sinks, err := audio.Sinks()
+	if err != nil {
+		return false, err
+	}
+	fb, ok := audio.PickFallback(sinks, prefix)
+	if !ok {
+		return false, fmt.Errorf("无其他可用输出，跳过音频切换")
+	}
+	if err := audio.SetDefault(fb.Name); err != nil {
+		return false, err
+	}
+	moved, _ := audio.MoveAllStreams(fb.Name)
+	fmt.Printf("默认输出切回 %s（迁移 %d 个播放流）\n", fb.Name, moved)
+	return true, nil
 }
 
 func runStatus() error {

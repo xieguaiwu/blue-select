@@ -13,6 +13,9 @@ Bluetooth headphone one-shot connect & audio switch for Linux (bluez + PipeWire/
 # Connect device (fuzzy name match) and switch audio output
 blue-select connect freearc
 
+# Disconnect device; default output falls back to a local sink
+blue-select disconnect freearc
+
 # Show devices, battery, A2DP profile, sinks and default output
 blue-select status
 

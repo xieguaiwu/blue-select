@@ -57,3 +57,54 @@ func TestWaitBluezTimeout(t *testing.T) {
 		t.Fatal("want timeout error")
 	}
 }
+
+func TestBluezSinkPrefix(t *testing.T) {
+	if got := BluezSinkPrefix("30:96:10:FD:B6:88"); got != "bluez_output.30_96_10_FD_B6_88." {
+		t.Fatalf("prefix = %q", got)
+	}
+}
+
+func TestPickFallback(t *testing.T) {
+	prefix := "bluez_output.30_96_10_FD_B6_88."
+	sinks := []Sink{
+		{Name: "alsa_output.pci-0000_00_1f.3.analog-stereo", State: "SUSPENDED"},
+		{Name: "bluez_output.30_96_10_FD_B6_88.1", State: "RUNNING"},
+		{Name: "bluez_output.30_96_10_FD_B6_88.2", State: "IDLE"},
+		{Name: "alsa_output.usb.analog", State: "RUNNING"},
+	}
+	got, ok := PickFallback(sinks, prefix)
+	if !ok {
+		t.Fatal("want fallback found")
+	}
+	if got.Name != "alsa_output.usb.analog" {
+		t.Fatalf("fallback = %q, want RUNNING 优先", got.Name)
+	}
+}
+
+func TestPickFallbackNoExcluded(t *testing.T) {
+	prefix := "bluez_output.30_96_10_FD_B6_88."
+	sinks := []Sink{
+		{Name: "alsa_output.pci-0000_00_1f.3.analog-stereo", State: "SUSPENDED"},
+		{Name: "alsa_output.usb.analog", State: "IDLE"},
+	}
+	got, ok := PickFallback(sinks, prefix)
+	if !ok || got.Name != "alsa_output.usb.analog" {
+		t.Fatalf("want IDLE 优先于 SUSPENDED, got %+v ok=%v", got, ok)
+	}
+}
+
+func TestPickFallbackAllExcluded(t *testing.T) {
+	prefix := "bluez_output.30_96_10_FD_B6_88."
+	sinks := []Sink{
+		{Name: "bluez_output.30_96_10_FD_B6_88.1", State: "RUNNING"},
+	}
+	if _, ok := PickFallback(sinks, prefix); ok {
+		t.Fatal("want not found when all excluded")
+	}
+}
+
+func TestPickFallbackEmpty(t *testing.T) {
+	if _, ok := PickFallback(nil, "x."); ok {
+		t.Fatal("want not found on empty input")
+	}
+}

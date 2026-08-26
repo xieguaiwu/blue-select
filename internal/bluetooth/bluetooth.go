@@ -103,3 +103,16 @@ func Connect(mac string) error {
 	}
 	return nil
 }
+
+// Disconnect 断开设备。失败时带回显摘要。
+func Disconnect(mac string) error {
+	out, err := exec.Command("timeout", "30", "bluetoothctl", "disconnect", mac).CombinedOutput()
+	msg := strings.TrimSpace(string(out))
+	if err != nil {
+		return fmt.Errorf("disconnect %s: %w: %s", mac, err, msg)
+	}
+	if strings.Contains(msg, "Failed") {
+		return fmt.Errorf("disconnect %s: %s", mac, msg)
+	}
+	return nil
+}

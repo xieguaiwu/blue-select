@@ -69,6 +69,41 @@ func BluezSink() (Sink, bool) {
 	return Sink{}, false
 }
 
+// BluezSinkPrefix 返回指定设备 MAC 的所有 sink 名公共前缀（冒号换下划线）。
+// 同一设备的 A2DP/HFP profile 会产生 .1/.2 多个 sink，用前缀一并排除。
+func BluezSinkPrefix(mac string) string {
+	return "bluez_output." + strings.ReplaceAll(mac, ":", "_") + "."
+}
+
+// PickFallback 从 sinks 中选回退输出：排除 exclude 前缀的 sink，
+// 状态优先级 RUNNING > IDLE > SUSPENDED > 其他，同级保持原顺序。
+func PickFallback(sinks []Sink, excludePrefix string) (Sink, bool) {
+	prio := func(state string) int {
+		switch state {
+		case "RUNNING":
+			return 0
+		case "IDLE":
+			return 1
+		case "SUSPENDED":
+			return 2
+		default:
+			return 3
+		}
+	}
+	var best Sink
+	found := false
+	for _, s := range sinks {
+		if strings.HasPrefix(s.Name, excludePrefix) {
+			continue
+		}
+		// 严格小于保证同级时保留先出现的（稳定）
+		if !found || prio(s.State) < prio(best.State) {
+			best, found = s, true
+		}
+	}
+	return best, found
+}
+
 // Default 返回默认 sink 名。
 func Default() (string, error) {
 	out, err := pactl("10", "get-default-sink")

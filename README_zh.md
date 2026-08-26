@@ -13,6 +13,9 @@ Linux 蓝牙耳机一键连接 + 音频输出自动切换工具（bluez + PipeWi
 # 连接设备（名字模糊匹配）并切换音频输出
 blue-select connect freearc
 
+# 断开设备；默认输出自动切回本地 sink
+blue-select disconnect freearc
+
 # 显示设备、电量、A2DP profile、sink 列表与默认输出
 blue-select status
 
