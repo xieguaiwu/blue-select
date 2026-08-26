@@ -36,7 +36,7 @@ blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（c
 - **配置**：`~/.config/blue-select/config.json`（0644），首次 connect <名字> 成功即记录并设默认
 
 ## 知识图谱
-未生成（可选：`graphify update . --no-llm`）
+graphify-out/ 已生成（2026-08-26，107 节点 / 193 边 / 9 社区），已提交 git。代码变更后重建：`graphify update .`
 
 ## 相关文档
 - 实施计划：docs/plans/2026-08-22-blue-select-cli.md（含实测事实节与 Self-Review 记录）
