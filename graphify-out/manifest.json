@@ -1,0 +1,97 @@
+{
+  "go.mod": {
+    "mtime": 1787409183.6818976,
+    "ast_hash": "edd72e04e8b3d791450109395fcc266c",
+    "semantic_hash": ""
+  },
+  "internal/audio/audio.go": {
+    "mtime": 1787718275.4981306,
+    "ast_hash": "c0839489f2b57e7a10a308b7f74504a6",
+    "semantic_hash": ""
+  },
+  "internal/audio/audio_test.go": {
+    "mtime": 1787718465.512107,
+    "ast_hash": "1599cac172a95403451e5eec1c6e0f37",
+    "semantic_hash": ""
+  },
+  "internal/bluetooth/bluetooth.go": {
+    "mtime": 1787718256.213843,
+    "ast_hash": "d326c7207708164d0b000f4598a6bdb2",
+    "semantic_hash": ""
+  },
+  "internal/bluetooth/bluetooth_test.go": {
+    "mtime": 1787409273.4474523,
+    "ast_hash": "1e7236c7fc2b74e82b795e348acb1cb2",
+    "semantic_hash": ""
+  },
+  "internal/config/config.go": {
+    "mtime": 1787409217.353252,
+    "ast_hash": "168d1a1a9d081d25b62fa2b3b01f2f37",
+    "semantic_hash": ""
+  },
+  "internal/config/config_test.go": {
+    "mtime": 1787409217.355252,
+    "ast_hash": "bed495e0650982feb9df9ed27019d7a1",
+    "semantic_hash": ""
+  },
+  "main.go": {
+    "mtime": 1787718459.5970116,
+    "ast_hash": "fabddf1e89cc9a52e30a8b413fe6ce37",
+    "semantic_hash": ""
+  },
+  "main_test.go": {
+    "mtime": 1787409491.5014348,
+    "ast_hash": "100e125268cdfb06ba7d03d06bbae8f6",
+    "semantic_hash": ""
+  },
+  "CONTEXT_FOR_NEXT_AGENT.md": {
+    "mtime": 1787718497.0553765,
+    "ast_hash": "dade8cef4b9a93a24f7fa72bab9b1892",
+    "semantic_hash": ""
+  },
+  "README.md": {
+    "mtime": 1787718476.800289,
+    "ast_hash": "62c42fe8007da8166abf8223788a7ef9",
+    "semantic_hash": ""
+  },
+  "README_zh.md": {
+    "mtime": 1787718476.813289,
+    "ast_hash": "c79bc5969c78a6b990e0a1661157c3c6",
+    "semantic_hash": ""
+  },
+  "docs/plans/2026-08-22-blue-select-cli.md": {
+    "mtime": 1787410463.3512506,
+    "ast_hash": "b4caae6653569540b2add215f9f7ccb4",
+    "semantic_hash": ""
+  },
+  "internal/audio/testdata/cards.txt": {
+    "mtime": 1787409369.621444,
+    "ast_hash": "6c9b1283f6cd36713c398f31547ccf3d",
+    "semantic_hash": ""
+  },
+  "internal/audio/testdata/sink_inputs.txt": {
+    "mtime": 1787409369.6217422,
+    "ast_hash": "3d2977fde09d455d46360aa82b330c69",
+    "semantic_hash": ""
+  },
+  "internal/audio/testdata/sinks.txt": {
+    "mtime": 1787409369.621444,
+    "ast_hash": "563dbaec351389bbb1f304b53ee502d8",
+    "semantic_hash": ""
+  },
+  "internal/bluetooth/testdata/devices.txt": {
+    "mtime": 1787409273.447133,
+    "ast_hash": "bf3ca5d9c6df606ce4908235dd019ebc",
+    "semantic_hash": ""
+  },
+  "internal/bluetooth/testdata/info_connected.txt": {
+    "mtime": 1787409273.4474523,
+    "ast_hash": "2f3b6fa08af9f5bfa49ff58ebc56bb95",
+    "semantic_hash": ""
+  },
+  "internal/bluetooth/testdata/info_disconnected.txt": {
+    "mtime": 1787409273.447133,
+    "ast_hash": "be0898ab46959477ae9338381b7866f3",
+    "semantic_hash": ""
+  }
+}
