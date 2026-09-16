@@ -64,6 +64,27 @@ go test ./...
 - `watch` 只负责音频路由切换，不负责重连耳机；重连依赖 bluetoothd 对 trusted 设备的自动回连。
 - 仅提供非交互子命令，无 TUI。
 
+## 故障排查
+
+**报错「配对密钥丢失」（底层 `br-connection-key-missing`）**
+
+配对记录损坏，须删除后重新配对：
+
+```bash
+bluetoothctl remove <MAC>
+# 让耳机进入配对模式。FreeArc：双耳入盒 + 开盖 + 长按盒内功能键 2-5 秒，盒身白灯闪烁
+```
+
+配对时 bluez 要求确认 6 位配对码（`Confirm passkey 123456 (yes/no)`），须回答 `yes`。用管道喂命令时这条提示会吞掉你的下一条命令——改用能自动应答的脚本，详见 skill `bluetooth-pairing-troubleshoot`。
+
+**扫描不到设备 / 连接偶发超时**
+
+Intel 蓝牙适配器的 USB 自动挂起会导致此问题（内核日志：`hci0: Reading supported features failed (-16)`）。用脚本修复，需 sudo，立即生效且重启后保持：
+
+```bash
+sudo bash ~/Downloads/fix-bluetooth-usb-autosuspend.sh
+```
+
 ## 许可证
 
 [MIT](LICENSE)

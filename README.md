@@ -64,6 +64,27 @@ go test ./...
 - `watch` only switches audio routing; it does not reconnect the headset. Reconnection relies on bluetoothd auto-reconnect for trusted devices.
 - Non-interactive subcommands only; no TUI.
 
+## Troubleshooting
+
+**Error "pairing key missing" (underlying `br-connection-key-missing`)**
+
+The pairing record is corrupt. Remove it and pair again:
+
+```bash
+bluetoothctl remove <MAC>
+# Put the headset in pairing mode. For FreeArc: both buds in the case, lid open, hold the case button 2-5 s until the LED flashes white.
+```
+
+BlueZ asks you to confirm a 6-digit passkey (`Confirm passkey 123456 (yes/no)`) and needs a `yes` answer. When you pipe commands in, this prompt swallows your next command — use a script that answers it automatically. See the `bluetooth-pairing-troubleshoot` skill.
+
+**No devices found while scanning / occasional connect timeouts**
+
+USB autosuspend on Intel Bluetooth adapters causes this (kernel log: `hci0: Reading supported features failed (-16)`). Fix it with the script below. It needs sudo, takes effect immediately, and survives reboot:
+
+```bash
+sudo bash ~/Downloads/fix-bluetooth-usb-autosuspend.sh
+```
+
 ## License
 
 [MIT](LICENSE)
