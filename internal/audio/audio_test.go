@@ -52,7 +52,10 @@ func TestParseActiveProfileRealLayout(t *testing.T) {
 }
 
 func TestWaitBluezTimeout(t *testing.T) {
-	// 空环境无 bluez sink，应超时而非挂死。
+	// 无 bluez sink 时应超时而非挂死；耳机连着时 BluezSink 立即命中，跳过该用例。
+	if s, ok := BluezSink(); ok {
+		t.Skipf("检测到 bluez sink（耳机连着）: %s，跳过超时用例", s.Name)
+	}
 	if _, err := WaitBluez(800 * time.Millisecond); err == nil {
 		t.Fatal("want timeout error")
 	}

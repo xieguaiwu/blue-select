@@ -2,11 +2,21 @@
 package bluetooth
 
 import (
+	"errors"
 	"fmt"
 	"os/exec"
 	"strconv"
 	"strings"
 )
+
+// isTimeoutExit 判断 err 是否为 timeout 命令的 124 超时退出。
+func isTimeoutExit(err error) bool {
+	var ee *exec.ExitError
+	if ok := errors.As(err, &ee); ok {
+		return ee.ExitCode() == 124
+	}
+	return false
+}
 
 // Device 是 bluetoothctl devices 里的一条已知设备。
 type Device struct {
@@ -92,10 +102,21 @@ func Info_(mac string) (Info, error) {
 }
 
 // Connect 连接设备。失败时带回显摘要。
+// bluetoothctl connect 在部分设备上连接成功后不退出（等待信号/卡住），
+// timeout 124 强杀后设备实际已连上——此时回查 info 确认连接状态，连上即视为成功。
 func Connect(mac string) error {
 	out, err := exec.Command("timeout", "30", "bluetoothctl", "connect", mac).CombinedOutput()
 	msg := strings.TrimSpace(string(out))
+	// 配对密钥丢失：原始输出对用户无意义，改为可操作的修复指引。
+	if strings.Contains(msg, "br-connection-key-missing") {
+		return fmt.Errorf("connect %s: 配对密钥丢失，需重新配对——先 `bluetoothctl remove %s`，再让耳机进入配对模式后重新配对", mac, mac)
+	}
 	if err != nil {
+		if isTimeoutExit(err) {
+			if info, ierr := Info_(mac); ierr == nil && info.Connected {
+				return nil
+			}
+		}
 		return fmt.Errorf("connect %s: %w: %s", mac, err, msg)
 	}
 	if strings.Contains(msg, "Failed") {
