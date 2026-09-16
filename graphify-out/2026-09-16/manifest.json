@@ -10,13 +10,13 @@
     "semantic_hash": ""
   },
   "internal/audio/audio_test.go": {
-    "mtime": 1789518175.2091303,
-    "ast_hash": "5aff67ba57e7348b832e93e17b728144",
+    "mtime": 1787718465.512107,
+    "ast_hash": "1599cac172a95403451e5eec1c6e0f37",
     "semantic_hash": ""
   },
   "internal/bluetooth/bluetooth.go": {
-    "mtime": 1789518178.8331585,
-    "ast_hash": "8f67c2df8964f3a212cef546fa7c6fd7",
+    "mtime": 1787718256.213843,
+    "ast_hash": "d326c7207708164d0b000f4598a6bdb2",
     "semantic_hash": ""
   },
   "internal/bluetooth/bluetooth_test.go": {
@@ -45,18 +45,18 @@
     "semantic_hash": ""
   },
   "CONTEXT_FOR_NEXT_AGENT.md": {
-    "mtime": 1789518446.2322462,
-    "ast_hash": "f7b6f9bcc0fd2f67ddf01d55ccc595c5",
+    "mtime": 1787718497.0553765,
+    "ast_hash": "dade8cef4b9a93a24f7fa72bab9b1892",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1789518419.7380393,
-    "ast_hash": "84aa0d9e95bd379fbb69fe27fa042b36",
+    "mtime": 1787718476.800289,
+    "ast_hash": "62c42fe8007da8166abf8223788a7ef9",
     "semantic_hash": ""
   },
   "README_zh.md": {
-    "mtime": 1789518415.1670036,
-    "ast_hash": "4b345917cd2910b9aed8bf51feffac39",
+    "mtime": 1787718476.813289,
+    "ast_hash": "c79bc5969c78a6b990e0a1661157c3c6",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-22-blue-select-cli.md": {
