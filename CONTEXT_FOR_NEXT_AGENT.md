@@ -1,7 +1,7 @@
 # CONTEXT_FOR_NEXT_AGENT.md
 
 ## 项目当前状态
-blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（connect / disconnect / status / watch / install 五个子命令）。**开发完成 + 真机端到端验证通过（2026-09-16 / 2026-09-21）：connect 0.12–1.74s exit 0、disconnect 2.87s exit 0、watch 自动切换有日志证据、单测全绿（4 包）、go vet 干净、已部署 `~/.local/bin/blue-select`、blue-select-watch 服务 active。** USB 自动挂起永久修复已由用户执行并验证到位（udev 规则在位，`power/control=on` / `runtime=active`）。
+blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（connect / pair / disconnect / status / watch / install 六个子命令）。**开发完成 + 真机端到端验证通过（2026-09-16 / 2026-09-21）：connect 0.12–1.74s exit 0、disconnect 2.87s exit 0、watch 自动切换有日志证据、单测全绿（4 包）、go vet 干净、已部署 `~/.local/bin/blue-select`、blue-select-watch 服务 active。** USB 自动挂起永久修复已由用户执行并验证到位（udev 规则在位，`power/control=on` / `runtime=active`）。
 
 ## 最后一次完成的工作（2026-09-21）
 修复「连上了但音频是单声道」的假成功——`runConnect` 只调 `WaitBluez()`（仅确认 bluez sink **存在**），从不校验 **Active Profile**。
@@ -27,6 +27,26 @@ blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（c
 | `go test ./...` / `go vet ./...` / `gofmt -l` | 4 包全 ok / 无输出 / 无输出 |
 
 **未覆盖**：恢复链②（A2DP 档整个消失 → 断连重连）无法人为构造故障态，未做真机复现；该路径的断连重连两步在 2026-09-21 故障现场已手工验证有效。
+
+### 同日续作：pair 子命令 + watch 档位校验（2026-09-21 10:20–11:00）
+
+**1. 新增 `pair` 子命令**——把「密钥丢失 → 重新配对」从手工流程变成一条命令。
+
+流程：断开 → **扫描确认耳机在配对模式** → 删旧记录 → 同会话扫描+配对 → trust → 复用 `runConnect`（含档位校验）。
+
+两个关键设计：
+- **先扫描再删记录**：删记录会破坏现有配对。若耳机没进配对模式就先把记录删了，用户会从「配对损坏」变成「彻底没配对」。扫描不到就原样返回，什么都不动
+- **扫描与 pair 同一会话**：bluez 会丢弃非活跃扫描期间发现的未配对设备，分两次调用会报 `Device <MAC> not available`
+
+实现：`internal/bluetooth` 新增 `bluezSession`（长驻 bluetoothctl + 字节块累积读输出 + 自动应答每个 `(yes/no)` 提示）+ `Pair()` + `Trust()` + `lastMeaningfulLine()`。可选 `--scan-timeout=<秒>`（默认 90）。
+
+真机验证（错误路径，耳机关机态）：`blue-select pair FreeArc --scan-timeout=12` → 12.0s exit 1，报「扫描 12s 未发现…（现有配对记录未改动）」，**前后 `Paired: yes` / `Trusted: yes` 不变**——安全属性成立。happy path（真实 passkey 应答）需耳机入配对模式，本轮未验。
+
+**2. `watch` 增加档位校验**——切默认输出前先查档位：非 A2DP 时只做低风险的 `set-card-profile` 修复；A2DP 档整个消失时**只告警不重连**（守护进程不宜自作主张打断用户正在听的声音）。新增 `audio.SinkMAC()` 从 sink 名反解 MAC。
+
+**3. 回归**：`go test ./...` 25 用例全绿 / vet / gofmt 干净；已重新部署 `~/.local/bin/blue-select` 并重启 watch 服务。
+
+**恢复链② 真机复现尝试（未果）**：曾用临时 wireplumber 配置（`monitor.bluez.properties` 限制 `bluez5.roles = [ hfp_hf ]`，置 `~/.config/wireplumber/wireplumber.conf.d/`）构造「A2DP 档消失」态，但期间耳机已关机（不广播、`br-connection-unknown`），无法完成复现。**配置已完整回退**（`~/.config/wireplumber/` 整个删除 + wireplumber 重启）。该路径仍待耳机可用时补验。
 
 ## 上次完成的工作（2026-09-16）
 真机回归暴露并修复「连接超时误报失败」——用户报告 `blue-select connect FreeArc` 卡 15–30s 后 `exit status 124`，但设备实际已连上。
@@ -68,9 +88,9 @@ blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（c
 
 ## 遗留问题 / 待办
 - [x] ~~USB 自动挂起永久修复待用户执行~~ **已完成（2026-09-21 复核）**：`/etc/udev/rules.d/99-bluetooth-no-autosuspend.rules` 在位，`1-7/power/control=on`、`runtime_status=active`。注：开机仍会打一条 `hci0: Reading supported features failed (-16)`（udev 规则晚于 btusb 探测的竞态），当前不影响连接。`/etc/modprobe.d/disable-usb-autosuspend.conf` 仍无效（usbcore 内核内置），可清理
-- [ ] 可选：新增 `pair` 子命令，自动化「密钥丢失 → 重新配对」流程（含 passkey 自动应答）；当前只能按 README 故障排查手工操作
-- [ ] 可选：`watch` 目前不校验档位——它会把默认输出切到 HSP/HFP 的 bluez sink 而不告警（2026-09-21 观察）。是否让它也做 A2DP 校验待定
-- [ ] 可选：恢复链② 缺真机复现（见上「未覆盖」）。若要补，可在测试机上用 `pactl set-card-profile … off` + 并发 A2DP 抢占来逼近
+- [x] ~~可选：新增 `pair` 子命令~~ **已完成（2026-09-21）**——含 passkey 自动应答与「先扫描再删记录」安全设计；happy path 待耳机可用时真机验证
+- [x] ~~可选：`watch` 不校验档位~~ **已完成（2026-09-21）**——非 A2DP 时做低风险切档，A2DP 档消失时告警
+- [ ] **恢复链② 真机复现**（2026-09-21 尝试未果，耳机关机）——待耳机可用时补：用 wireplumber 临时限制 `bluez5.roles` 构造故障态，验证后必须回退配置
 - [ ] 可选：试验 PipeWire module-switch-on-connect 与 watch 的行为重叠（计划文档「前置实验」节）
 
 ## 技术要点（下一位 Agent 必读）
@@ -95,9 +115,9 @@ blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（c
 - **配置**：`~/.config/blue-select/config.json`（0644），首次 connect <名字> 成功即记录并设默认
 
 ## 知识图谱
-graphify-out/ 已生成（2026-09-21，129 节点 / 254 边 / 10 社区），已提交 git。代码变更后重建：`graphify update .`
+graphify-out/ 已生成（2026-09-21，148 节点 / 302 边 / 9 社区），已提交 git。代码变更后重建：`graphify update .`
 
-God Nodes：`runConnect()` (14) / `ensurePlaybackProfile()` (10) / `ResolveDevice()` (9) / `runStatus()` (9) / `ParseProfiles()` (8)。
+God Nodes：`runConnect()` (15) / `runWatch()` (11) / `Pair()` (10) / `ResolveDevice()` (10)。
 
 ## 相关文档
 - 实施计划：docs/plans/2026-08-22-blue-select-cli.md（含实测事实节与 Self-Review 记录）

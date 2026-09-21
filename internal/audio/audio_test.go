@@ -3,6 +3,7 @@ package audio
 
 import (
 	"os"
+	"strings"
 	"testing"
 	"time"
 )
@@ -64,6 +65,26 @@ func TestWaitBluezTimeout(t *testing.T) {
 func TestBluezSinkPrefix(t *testing.T) {
 	if got := BluezSinkPrefix("30:96:10:FD:B6:88"); got != "bluez_output.30_96_10_FD_B6_88." {
 		t.Fatalf("prefix = %q", got)
+	}
+}
+
+func TestSinkMAC(t *testing.T) {
+	mac, ok := SinkMAC("bluez_output.30_96_10_FD_B6_88.1")
+	if !ok || mac != "30:96:10:FD:B6:88" {
+		t.Fatalf("SinkMAC = %q ok=%v", mac, ok)
+	}
+	// 与 BluezSinkPrefix 往返一致
+	if got := BluezSinkPrefix(mac); !strings.HasPrefix("bluez_output.30_96_10_FD_B6_88.1", got) {
+		t.Fatalf("roundtrip mismatch: prefix %q", got)
+	}
+	for _, bad := range []string{
+		"alsa_output.pci-0000_00_1f.3.analog-stereo",
+		"bluez_output.short",
+		"",
+	} {
+		if _, ok := SinkMAC(bad); ok {
+			t.Errorf("SinkMAC(%q) = ok, want false", bad)
+		}
 	}
 }
 

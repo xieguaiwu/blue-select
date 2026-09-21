@@ -5,23 +5,23 @@
     "semantic_hash": ""
   },
   "internal/audio/audio.go": {
-    "mtime": 1789956762.1227365,
-    "ast_hash": "03f56f607345bdfe245c5d7ec8d3d8d7",
+    "mtime": 1789957831.7972133,
+    "ast_hash": "fe75fadc84b974c848af544bd0a7df1c",
     "semantic_hash": ""
   },
   "internal/audio/audio_test.go": {
-    "mtime": 1789956710.7802484,
-    "ast_hash": "9f714f81d11b1b23a3830118eb97e238",
+    "mtime": 1789957842.6343102,
+    "ast_hash": "e3e0f29781b58cc896cdc24993b49d4b",
     "semantic_hash": ""
   },
   "internal/bluetooth/bluetooth.go": {
-    "mtime": 1789518178.8331585,
-    "ast_hash": "8f67c2df8964f3a212cef546fa7c6fd7",
+    "mtime": 1789958059.056243,
+    "ast_hash": "2b1cadc2cbbecae8b688d1cc24b951e1",
     "semantic_hash": ""
   },
   "internal/bluetooth/bluetooth_test.go": {
-    "mtime": 1787409273.4474523,
-    "ast_hash": "1e7236c7fc2b74e82b795e348acb1cb2",
+    "mtime": 1789957976.2695036,
+    "ast_hash": "1b9e3cdac1c5af5a3fa289c72707fa77",
     "semantic_hash": ""
   },
   "internal/config/config.go": {
@@ -35,8 +35,8 @@
     "semantic_hash": ""
   },
   "main.go": {
-    "mtime": 1789956796.1890383,
-    "ast_hash": "df58e2d6d28baebc9cb700c5b0fcefdc",
+    "mtime": 1789957951.3082807,
+    "ast_hash": "bffc2efb4f49054707939320277d02d2",
     "semantic_hash": ""
   },
   "main_test.go": {
@@ -45,18 +45,18 @@
     "semantic_hash": ""
   },
   "CONTEXT_FOR_NEXT_AGENT.md": {
-    "mtime": 1789956953.6044326,
-    "ast_hash": "556febde29933d505935ef217d532594",
+    "mtime": 1789958230.622775,
+    "ast_hash": "74b31153c20c4afe41b2933908332420",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1789956923.1371627,
-    "ast_hash": "2bc6ef7d59c87b4c9a4500f3847bdf11",
+    "mtime": 1789958213.395621,
+    "ast_hash": "f567a57f3723f6ddd76c01b0d33dcc76",
     "semantic_hash": ""
   },
   "README_zh.md": {
-    "mtime": 1789956923.2101634,
-    "ast_hash": "4794996ae6a645b73466678465df7995",
+    "mtime": 1789958213.4106214,
+    "ast_hash": "077e4e33e2fa4848345dc581253eb25e",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-22-blue-select-cli.md": {

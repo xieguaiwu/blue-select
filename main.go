@@ -7,6 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 
@@ -28,6 +29,22 @@ func main() {
 			name = os.Args[2]
 		}
 		err = runConnect(name)
+	case "pair":
+		name := ""
+		scanTimeout := 90 * time.Second
+		for _, a := range os.Args[2:] {
+			if v, ok := strings.CutPrefix(a, "--scan-timeout="); ok {
+				secs, perr := strconv.Atoi(v)
+				if perr != nil || secs <= 0 {
+					fmt.Fprintln(os.Stderr, "blue-select: --scan-timeout 需为正整数秒")
+					os.Exit(2)
+				}
+				scanTimeout = time.Duration(secs) * time.Second
+				continue
+			}
+			name = a
+		}
+		err = runPair(name, scanTimeout)
 	case "disconnect":
 		name := ""
 		if len(os.Args) > 2 {
@@ -57,6 +74,8 @@ func usage() {
 
 用法:
   blue-select connect [设备名]      连接设备并切换音频输出（无参用默认设备）
+  blue-select pair [设备名]         重新配对设备（自动删旧记录、应答 passkey 并连接）
+                                    可选 --scan-timeout=<秒> 调整扫描窗口（默认 90）
   blue-select disconnect [设备名]   断开设备，默认输出切回本地（无参用默认设备）
   blue-select status               显示连接、电量、profile、输出状态
   blue-select watch                监听新蓝牙 sink，自动设默认并迁移播放流
@@ -237,6 +256,49 @@ func waitProfiles(mac string) (audio.CardProfiles, error) {
 	return audio.CardProfiles{}, lastErr
 }
 
+// runPair 重新配对设备：删旧记录 → 同会话扫描+配对（自动应答 passkey）→ trust → 连接。
+// 配对完成后复用 runConnect，一并完成档位校验与输出切换。
+func runPair(name string, scanTimeout time.Duration) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	devs, err := bluetooth.ListDevices()
+	if err != nil {
+		return err
+	}
+	mac, err := ResolveDevice(cfg, name, devs)
+	if err != nil {
+		return err
+	}
+	devName := name
+	for _, d := range devs {
+		if d.MAC == mac {
+			devName = d.Name
+		}
+	}
+
+	fmt.Printf("重新配对 %s (%s)\n", devName, mac)
+	fmt.Println("请让耳机进入配对模式——FreeArc：双耳入盒 + 保持开盖 + 长按盒内功能键 2-5 秒（盒身白灯闪烁）")
+	fmt.Println()
+
+	res, err := bluetooth.Pair(mac, scanTimeout, func(format string, a ...any) {
+		fmt.Printf("  "+format+"\n", a...)
+	})
+	if err != nil {
+		return err
+	}
+	if !res.Paired {
+		return fmt.Errorf("配对未完成")
+	}
+
+	if err := bluetooth.Trust(mac); err != nil {
+		fmt.Fprintln(os.Stderr, "警告: trust 失败（不影响本次连接，但下次开机不会自动回连）:", err)
+	}
+	// 配对完成，复用 connect 的连接 + 档位校验 + 输出切换
+	return runConnect(mac)
+}
+
 // runDisconnect 断开设备。若默认输出是该设备的 bluez sink，先把音频迁到回退 sink，
 // 再执行 bluetoothctl disconnect，避免播放流卡在即将消失的 sink 上。
 func runDisconnect(name string) error {
@@ -391,6 +453,26 @@ func runWatch() error {
 		s, ok := audio.BluezSink()
 		if !ok {
 			continue // 蓝牙 sink 消失（耳机断开），不动作
+		}
+		// 档位校验：bluez 回落 HSP/HFP 时 sink 是 mono 16kHz。
+		// 守护进程只做低风险的 set-card-profile；A2DP 档整个消失时告警而不断连重连
+		// （重连会打断用户正在听的声音，交给 blue-select connect 显式触发）。
+		if mac, macOK := audio.SinkMAC(s.Name); macOK {
+			if profs, err := audio.Profiles(mac); err == nil && !audio.IsA2DP(profs.Active) {
+				if target, ok := audio.PickA2DPProfile(profs.Available); ok {
+					if err := audio.SetCardProfile(mac, target); err == nil {
+						time.Sleep(300 * time.Millisecond) // 等 sink 按新档位重建
+						if s2, ok2 := audio.BluezSink(); ok2 {
+							s = s2
+						}
+						logf("音频档位 %s → %s", profs.Active, target)
+					} else {
+						logf("警告: 切档位 %s 失败: %v", target, err)
+					}
+				} else {
+					logf("警告: 音频档位为 %s（非 A2DP，单声道低音质），且 A2DP 档不可用；跑 blue-select connect 尝试恢复", profs.Active)
+				}
+			}
 		}
 		cur, err := audio.Default()
 		if err == nil && cur == s.Name {

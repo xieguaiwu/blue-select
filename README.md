@@ -14,6 +14,9 @@ Bluetooth headphone one-shot connect & audio switch for Linux (bluez + PipeWire/
 # Connect device (fuzzy name match) and switch audio output
 blue-select connect freearc
 
+# Re-pair a device (drops the old record, answers the passkey prompt, then connects)
+blue-select pair freearc
+
 # Disconnect device; default output falls back to a local sink
 blue-select disconnect freearc
 
@@ -62,7 +65,7 @@ go test ./...
 ## Known limitations
 
 - If the headphone is currently connected to your phone, it may refuse the computer connection (no broadcasting / connection race). Disconnect it on the phone first.
-- `watch` only switches audio routing; it does not reconnect the headset or verify the audio profile. Reconnection relies on bluetoothd auto-reconnect for trusted devices.
+- `watch` switches audio routing and repairs the audio profile with a low-risk `set-card-profile` only; it never reconnects the headset. Reconnection relies on bluetoothd auto-reconnect for trusted devices.
 - Non-interactive subcommands only; no TUI.
 
 ## Troubleshooting
@@ -72,11 +75,19 @@ go test ./...
 The pairing record is corrupt. Remove it and pair again:
 
 ```bash
+blue-select pair freearc      # drops the old record, answers the passkey prompt, reconnects
+```
+
+`pair` scans first and only drops the old record once the headset is actually advertising — so a headset that is not in pairing mode leaves your existing pairing untouched. Optional `--scan-timeout=<sec>` (default 90) tunes the scan window.
+
+Doing it by hand instead:
+
+```bash
 bluetoothctl remove <MAC>
 # Put the headset in pairing mode. For FreeArc: both buds in the case, lid open, hold the case button 2-5 s until the LED flashes white.
 ```
 
-BlueZ asks you to confirm a 6-digit passkey (`Confirm passkey 123456 (yes/no)`) and needs a `yes` answer. When you pipe commands in, this prompt swallows your next command — use a script that answers it automatically. See the `bluetooth-pairing-troubleshoot` skill.
+BlueZ asks you to confirm a 6-digit passkey (`Confirm passkey 123456 (yes/no)`) and needs a `yes` answer. When you pipe commands in, this prompt swallows your next command — use a script that answers it automatically, or just use `blue-select pair`. See the `bluetooth-pairing-troubleshoot` skill.
 
 **No devices found while scanning / occasional connect timeouts**
 

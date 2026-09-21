@@ -14,6 +14,9 @@ Linux 蓝牙耳机一键连接 + 音频输出自动切换工具（bluez + PipeWi
 # 连接设备（名字模糊匹配）并切换音频输出
 blue-select connect freearc
 
+# 重新配对设备（删旧记录、自动应答 passkey，然后连接）
+blue-select pair freearc
+
 # 断开设备；默认输出自动切回本地 sink
 blue-select disconnect freearc
 
@@ -62,7 +65,7 @@ go test ./...
 ## 已知限制
 
 - 耳机正连着手机时可能拒绝电脑连接（不广播/连接竞态），先在手机端断开。
-- `watch` 只负责音频路由切换，不负责重连耳机，也不校验音频档位；重连依赖 bluetoothd 对 trusted 设备的自动回连。
+- `watch` 负责音频路由切换，并只用低风险的 `set-card-profile` 修复音频档位；它不会重连耳机。重连依赖 bluetoothd 对 trusted 设备的自动回连。
 - 仅提供非交互子命令，无 TUI。
 
 ## 故障排查
@@ -72,11 +75,19 @@ go test ./...
 配对记录损坏，须删除后重新配对：
 
 ```bash
+blue-select pair freearc      # 删旧记录 + 自动应答 passkey + 重连，一气呵成
+```
+
+`pair` 先扫描、确认耳机真的在广播后才删旧记录——所以耳机没进配对模式时，现有配对不会被破坏。可选 `--scan-timeout=<秒>`（默认 90）调整扫描窗口。
+
+手工做法：
+
+```bash
 bluetoothctl remove <MAC>
 # 让耳机进入配对模式。FreeArc：双耳入盒 + 开盖 + 长按盒内功能键 2-5 秒，盒身白灯闪烁
 ```
 
-配对时 bluez 要求确认 6 位配对码（`Confirm passkey 123456 (yes/no)`），须回答 `yes`。用管道喂命令时这条提示会吞掉你的下一条命令——改用能自动应答的脚本，详见 skill `bluetooth-pairing-troubleshoot`。
+配对时 bluez 要求确认 6 位配对码（`Confirm passkey 123456 (yes/no)`），须回答 `yes`。用管道喂命令时这条提示会吞掉你的下一条命令——改用能自动应答的脚本，或直接用 `blue-select pair`。详见 skill `bluetooth-pairing-troubleshoot`。
 
 **扫描不到设备 / 连接偶发超时**
 

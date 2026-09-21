@@ -75,6 +75,26 @@ func BluezSinkPrefix(mac string) string {
 	return "bluez_output." + strings.ReplaceAll(mac, ":", "_") + "."
 }
 
+// SinkMAC 从 bluez sink 名反解设备 MAC。
+// "bluez_output.30_96_10_FD_B6_88.1" → "30:96:10:FD:B6:88"
+// 非 bluez sink 或形状不符时返回 false。
+func SinkMAC(sinkName string) (string, bool) {
+	rest, ok := strings.CutPrefix(sinkName, "bluez_output.")
+	if !ok {
+		return "", false
+	}
+	// 去掉尾部 profile 序号（.1 / .2 …）
+	if i := strings.LastIndex(rest, "."); i > 0 {
+		rest = rest[:i]
+	}
+	mac := strings.ReplaceAll(rest, "_", ":")
+	// 形如 30:96:10:FD:B6:88，共 17 字符
+	if len(mac) != 17 {
+		return "", false
+	}
+	return mac, true
+}
+
 // PickFallback 从 sinks 中选回退输出：排除 exclude 前缀的 sink，
 // 状态优先级 RUNNING > IDLE > SUSPENDED > 其他，同级保持原顺序。
 func PickFallback(sinks []Sink, excludePrefix string) (Sink, bool) {
