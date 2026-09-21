@@ -46,7 +46,13 @@ blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（c
 
 **3. 回归**：`go test ./...` 25 用例全绿 / vet / gofmt 干净；已重新部署 `~/.local/bin/blue-select` 并重启 watch 服务。
 
-**恢复链② 真机复现尝试（未果）**：曾用临时 wireplumber 配置（`monitor.bluez.properties` 限制 `bluez5.roles = [ hfp_hf ]`，置 `~/.config/wireplumber/wireplumber.conf.d/`）构造「A2DP 档消失」态，但期间耳机已关机（不广播、`br-connection-unknown`），无法完成复现。**配置已完整回退**（`~/.config/wireplumber/` 整个删除 + wireplumber 重启）。该路径仍待耳机可用时补验。
+**恢复链② 真机复现尝试（结论：此路不通，2026-09-21 两轮实测）**：曾用临时 wireplumber 配置（`monitor.bluez.properties` 限制 `bluez5.roles = [ hfp_hf ]`，放 `~/.config/wireplumber/wireplumber.conf.d/`）试图构造「卡在但 A2DP 档消失」态。两轮结果：
+- 轮 1：重启 wireplumber 后设备掉线，立即重连报 `br-connection-unknown`
+- 轮 2：强制断连重连后，**耳机 10/10 次连不上**（日志 `spa.bluez5: No available A2DP codecs to register on adapter`）——说明去掉 A2DP 角色后耳机根本无法建立链路，构造不出目标态
+
+**结论**：`bluez5.roles` 手段产出的是「无卡/连不上」，而非目标故障态（卡在 + 仅 HSP 档），**不能用于复现恢复链②**。每轮均有 `trap` 保证清理，**配置与系统状态已逐次验证回退**（覆盖目录删除 + wireplumber 重启 + A2DP 恢复）。
+
+若要真正复现，需在 bluez 层面让 A2DP transport 注册失败而 HFP 成功（真实故障成因），难度高于收益，**建议不补做**；该路径的断连重连两步已在 2026-09-21 真实故障现场手工验证有效。
 
 ## 上次完成的工作（2026-09-16）
 真机回归暴露并修复「连接超时误报失败」——用户报告 `blue-select connect FreeArc` 卡 15–30s 后 `exit status 124`，但设备实际已连上。
@@ -90,7 +96,8 @@ blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（c
 - [x] ~~USB 自动挂起永久修复待用户执行~~ **已完成（2026-09-21 复核）**：`/etc/udev/rules.d/99-bluetooth-no-autosuspend.rules` 在位，`1-7/power/control=on`、`runtime_status=active`。注：开机仍会打一条 `hci0: Reading supported features failed (-16)`（udev 规则晚于 btusb 探测的竞态），当前不影响连接。`/etc/modprobe.d/disable-usb-autosuspend.conf` 仍无效（usbcore 内核内置），可清理
 - [x] ~~可选：新增 `pair` 子命令~~ **已完成（2026-09-21）**——含 passkey 自动应答与「先扫描再删记录」安全设计；happy path 待耳机可用时真机验证
 - [x] ~~可选：`watch` 不校验档位~~ **已完成（2026-09-21）**——非 A2DP 时做低风险切档，A2DP 档消失时告警
-- [ ] **恢复链② 真机复现**（2026-09-21 尝试未果，耳机关机）——待耳机可用时补：用 wireplumber 临时限制 `bluez5.roles` 构造故障态，验证后必须回退配置
+- [x] ~~恢复链② 真机复现~~ **已定性（2026-09-21）：此路不通，建议不补做**——`bluez5.roles` 手段只能产出「无卡/连不上」，无法构造目标故障态；详见上文。该路径的断连重连两步已在真实故障现场手工验证有效
+- [ ] 可选：`pair` happy path（真实 passkey 应答）待耳机入配对模式时补验（错误路径已验：不破坏现有配对）
 - [ ] 可选：试验 PipeWire module-switch-on-connect 与 watch 的行为重叠（计划文档「前置实验」节）
 
 ## 技术要点（下一位 Agent 必读）
