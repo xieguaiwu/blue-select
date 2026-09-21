@@ -8,6 +8,7 @@ Bluetooth headphone one-shot connect & audio switch for Linux (bluez + PipeWire/
 
 1. **Connected but sound still plays from speakers** — connecting via `bluetoothctl` does not switch PulseAudio/PipeWire default output. blue-select waits for the bluez sink, sets it as default and moves all existing playback streams.
 2. **Manual reconnect after sleep/wake** — one command: `blue-select connect`.
+3. **Connected but audio is mono / low quality** — after an A2DP transport failure, bluez falls back to the HSP/HFP call profile (`headset-head-unit`, mono 16 kHz) while still reporting the device as connected. blue-select verifies the active profile, switches it back to A2DP, and falls back to one disconnect/reconnect cycle when the A2DP profile is gone entirely.
 
 ```bash
 # Connect device (fuzzy name match) and switch audio output
@@ -16,7 +17,7 @@ blue-select connect freearc
 # Disconnect device; default output falls back to a local sink
 blue-select disconnect freearc
 
-# Show devices, battery, A2DP profile, sinks and default output
+# Show devices, battery, audio profile (flags non-A2DP), sinks and default output
 blue-select status
 
 # Daemon: auto-switch to any newly connected Bluetooth sink
@@ -61,7 +62,7 @@ go test ./...
 ## Known limitations
 
 - If the headphone is currently connected to your phone, it may refuse the computer connection (no broadcasting / connection race). Disconnect it on the phone first.
-- `watch` only switches audio routing; it does not reconnect the headset. Reconnection relies on bluetoothd auto-reconnect for trusted devices.
+- `watch` only switches audio routing; it does not reconnect the headset or verify the audio profile. Reconnection relies on bluetoothd auto-reconnect for trusted devices.
 - Non-interactive subcommands only; no TUI.
 
 ## Troubleshooting
@@ -84,6 +85,10 @@ USB autosuspend on Intel Bluetooth adapters causes this (kernel log: `hci0: Read
 ```bash
 sudo bash ~/Downloads/fix-bluetooth-usb-autosuspend.sh
 ```
+
+**Connected, but audio is mono and low quality (HSP/HFP instead of A2DP)**
+
+After an A2DP transport failure, bluez falls back to the HSP/HFP call profile (`headset-head-unit`, mono 16 kHz) while the device still reports as connected. `blue-select status` flags this as `⚠ non-A2DP`. Re-run `blue-select connect`: it switches the card back to `a2dp-sink`, and if that profile is gone entirely it performs one disconnect/reconnect cycle so bluez renegotiates A2DP. If the profile stays degraded, check whether the headset is held by another host (phone) and whether its battery is charged.
 
 ## License
 

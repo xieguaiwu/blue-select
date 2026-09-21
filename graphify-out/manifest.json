@@ -5,13 +5,13 @@
     "semantic_hash": ""
   },
   "internal/audio/audio.go": {
-    "mtime": 1787718275.4981306,
-    "ast_hash": "c0839489f2b57e7a10a308b7f74504a6",
+    "mtime": 1789956762.1227365,
+    "ast_hash": "03f56f607345bdfe245c5d7ec8d3d8d7",
     "semantic_hash": ""
   },
   "internal/audio/audio_test.go": {
-    "mtime": 1789518175.2091303,
-    "ast_hash": "5aff67ba57e7348b832e93e17b728144",
+    "mtime": 1789956710.7802484,
+    "ast_hash": "9f714f81d11b1b23a3830118eb97e238",
     "semantic_hash": ""
   },
   "internal/bluetooth/bluetooth.go": {
@@ -35,8 +35,8 @@
     "semantic_hash": ""
   },
   "main.go": {
-    "mtime": 1787718459.5970116,
-    "ast_hash": "fabddf1e89cc9a52e30a8b413fe6ce37",
+    "mtime": 1789956796.1890383,
+    "ast_hash": "df58e2d6d28baebc9cb700c5b0fcefdc",
     "semantic_hash": ""
   },
   "main_test.go": {
@@ -45,18 +45,18 @@
     "semantic_hash": ""
   },
   "CONTEXT_FOR_NEXT_AGENT.md": {
-    "mtime": 1789518446.2322462,
-    "ast_hash": "f7b6f9bcc0fd2f67ddf01d55ccc595c5",
+    "mtime": 1789956953.6044326,
+    "ast_hash": "556febde29933d505935ef217d532594",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1789518419.7380393,
-    "ast_hash": "84aa0d9e95bd379fbb69fe27fa042b36",
+    "mtime": 1789956923.1371627,
+    "ast_hash": "2bc6ef7d59c87b4c9a4500f3847bdf11",
     "semantic_hash": ""
   },
   "README_zh.md": {
-    "mtime": 1789518415.1670036,
-    "ast_hash": "4b345917cd2910b9aed8bf51feffac39",
+    "mtime": 1789956923.2101634,
+    "ast_hash": "4794996ae6a645b73466678465df7995",
     "semantic_hash": ""
   },
   "docs/plans/2026-08-22-blue-select-cli.md": {
@@ -92,6 +92,16 @@
   "internal/bluetooth/testdata/info_disconnected.txt": {
     "mtime": 1787409273.447133,
     "ast_hash": "be0898ab46959477ae9338381b7866f3",
+    "semantic_hash": ""
+  },
+  "internal/audio/testdata/cards_a2dp.txt": {
+    "mtime": 1789956694.8100963,
+    "ast_hash": "f558594b29bc2cbab0756539fcec41e9",
+    "semantic_hash": ""
+  },
+  "internal/audio/testdata/cards_hsp_only.txt": {
+    "mtime": 1789956694.8100963,
+    "ast_hash": "04b4e6bdee38afc55cd72a9eaed6863b",
     "semantic_hash": ""
   }
 }

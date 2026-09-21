@@ -152,32 +152,141 @@ func WaitBluez(timeout time.Duration) (Sink, error) {
 	}
 }
 
-// ParseActiveProfile 从 `pactl list cards` 输出取指定蓝牙卡的 Active Profile。
-// 实现按 Card 块切分：块内同时含 bluez_card.<mac> 与 Active Profile: 即命中，
-// 不依赖两行的先后顺序。
-func ParseActiveProfile(data []byte, mac string) (string, error) {
-	// 卡名用下划线格式（bluez_card.30_96_10_FD_B6_88），MAC 冒号需替换
-	needle := "bluez_card." + strings.ReplaceAll(mac, ":", "_")
-	for _, card := range bytes.Split(data, []byte("Card #")) {
-		block := string(card)
-		if !strings.Contains(block, needle) {
-			continue
-		}
-		for _, line := range strings.Split(block, "\n") {
-			if strings.HasPrefix(strings.TrimSpace(line), "Active Profile:") {
-				_, v, _ := strings.Cut(line, ":")
-				return strings.TrimSpace(v), nil
-			}
+// CardName 返回 bluez 音频卡名（MAC 冒号换下划线）。
+func CardName(mac string) string {
+	return "bluez_card." + strings.ReplaceAll(mac, ":", "_")
+}
+
+// CardProfiles 描述一张蓝牙卡的档位状态。
+// Available 只收录 `available: yes` 的档位——`available: no` 的档位切不过去。
+// 2026-09-21 实测：A2DP transport 失败后，卡的 Profiles 段里 a2dp-sink 可能整个消失。
+// 此时 Active 会回落到 headset-head-unit（HSP/HFP，mono 16kHz）。
+type CardProfiles struct {
+	Active    string
+	Available []string
+}
+
+// Has 报告某档位当前是否可选。
+func (p CardProfiles) Has(name string) bool {
+	for _, a := range p.Available {
+		if a == name {
+			return true
 		}
 	}
-	return "", fmt.Errorf("未找到 %s 的蓝牙卡或 Active Profile", mac)
+	return false
+}
+
+// cardBlock 返回含 bluez_card.<mac> 的那个 Card 块。
+func cardBlock(data []byte, mac string) (string, bool) {
+	needle := CardName(mac)
+	for _, card := range bytes.Split(data, []byte("Card #")) {
+		block := string(card)
+		if strings.Contains(block, needle) {
+			return block, true
+		}
+	}
+	return "", false
+}
+
+// ParseProfiles 解析指定蓝牙卡的 Active Profile 与可用档位列表。
+// 按 Card 块切分，块内同时含 bluez_card.<mac> 与 Active Profile: 即命中，
+// 不依赖两行的先后顺序。Profiles 段以缩进更深的行（两个 tab）为条目，
+// 遇到同级字段（Active Profile: / Ports:）即结束。
+func ParseProfiles(data []byte, mac string) (CardProfiles, error) {
+	block, ok := cardBlock(data, mac)
+	if !ok {
+		return CardProfiles{}, fmt.Errorf("未找到 %s 的蓝牙卡", mac)
+	}
+	var out CardProfiles
+	inProfiles := false
+	for _, line := range strings.Split(block, "\n") {
+		trimmed := strings.TrimSpace(line)
+		switch {
+		case trimmed == "Profiles:":
+			inProfiles = true
+			continue
+		case strings.HasPrefix(trimmed, "Active Profile:"):
+			_, v, _ := strings.Cut(trimmed, ":")
+			out.Active = strings.TrimSpace(v)
+			inProfiles = false
+			continue
+		}
+		if !inProfiles || trimmed == "" {
+			continue
+		}
+		// 条目缩进更深（两个 tab）；缩进变浅说明 Profiles 段已结束
+		if !strings.HasPrefix(line, "\t\t") {
+			inProfiles = false
+			continue
+		}
+		name, rest, ok := strings.Cut(trimmed, ":")
+		if !ok || name == "" {
+			continue
+		}
+		if strings.Contains(rest, "available: yes") {
+			out.Available = append(out.Available, name)
+		}
+	}
+	if out.Active == "" {
+		return CardProfiles{}, fmt.Errorf("未找到 %s 的 Active Profile", mac)
+	}
+	return out, nil
+}
+
+// ParseActiveProfile 从 `pactl list cards` 输出取指定蓝牙卡的 Active Profile。
+func ParseActiveProfile(data []byte, mac string) (string, error) {
+	p, err := ParseProfiles(data, mac)
+	if err != nil {
+		return "", err
+	}
+	return p.Active, nil
 }
 
 // ActiveProfile 查询指定设备的蓝牙音频 profile。
 func ActiveProfile(mac string) (string, error) {
-	out, err := pactl("10", "list", "cards")
+	p, err := Profiles(mac)
 	if err != nil {
 		return "", err
 	}
-	return ParseActiveProfile(out, mac)
+	return p.Active, nil
+}
+
+// Profiles 查询指定蓝牙卡的档位状态。
+func Profiles(mac string) (CardProfiles, error) {
+	out, err := pactl("10", "list", "cards")
+	if err != nil {
+		return CardProfiles{}, err
+	}
+	return ParseProfiles(out, mac)
+}
+
+// SetCardProfile 切换蓝牙卡的音频档位。
+func SetCardProfile(mac, profile string) error {
+	_, err := pactl("10", "set-card-profile", CardName(mac), profile)
+	return err
+}
+
+// IsA2DP 判断档位是否为 A2DP 播放档。
+// 非 A2DP 即 HSP/HFP 通话档（mono 16kHz 低音质），或 off。
+func IsA2DP(profile string) bool {
+	return strings.HasPrefix(profile, "a2dp-sink")
+}
+
+// PickA2DPProfile 从可用档位中挑优先级最高的 A2DP 档。
+// 优先级：a2dp-sink(AAC) > a2dp-sink-sbc_xq > a2dp-sink-sbc > 其他 a2dp-sink*。
+// 无 A2DP 档时返回 false。
+func PickA2DPProfile(profiles []string) (string, bool) {
+	for _, want := range []string{"a2dp-sink", "a2dp-sink-sbc_xq", "a2dp-sink-sbc"} {
+		for _, p := range profiles {
+			if p == want {
+				return p, true
+			}
+		}
+	}
+	for _, p := range profiles {
+		if IsA2DP(p) {
+			return p, true
+		}
+	}
+	return "", false
 }

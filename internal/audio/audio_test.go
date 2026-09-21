@@ -111,3 +111,104 @@ func TestPickFallbackEmpty(t *testing.T) {
 		t.Fatal("want not found on empty input")
 	}
 }
+
+func TestCardName(t *testing.T) {
+	if got := CardName("30:96:10:FD:B6:88"); got != "bluez_card.30_96_10_FD_B6_88" {
+		t.Fatalf("CardName = %q", got)
+	}
+}
+
+func TestIsA2DP(t *testing.T) {
+	for _, p := range []string{"a2dp-sink", "a2dp-sink-sbc", "a2dp-sink-sbc_xq"} {
+		if !IsA2DP(p) {
+			t.Errorf("IsA2DP(%q) = false, want true", p)
+		}
+	}
+	for _, p := range []string{"headset-head-unit", "headset-head-unit-cvsd", "off", ""} {
+		if IsA2DP(p) {
+			t.Errorf("IsA2DP(%q) = true, want false", p)
+		}
+	}
+}
+
+// TestParseProfilesA2DP 覆盖健康状态：A2DP 可用且为 Active Profile。
+func TestParseProfilesA2DP(t *testing.T) {
+	data, err := os.ReadFile("testdata/cards_a2dp.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profs, err := ParseProfiles(data, "30:96:10:FD:B6:88")
+	if err != nil {
+		t.Fatalf("ParseProfiles: %v", err)
+	}
+	if !profs.Has("a2dp-sink") || !profs.Has("headset-head-unit") {
+		t.Fatalf("profiles = %v, want both a2dp-sink and headset-head-unit", profs.Available)
+	}
+	if !profs.Has("a2dp-sink-sbc") {
+		t.Fatalf("profiles = %v, want a2dp-sink-sbc", profs.Available)
+	}
+	if profs.Active != "a2dp-sink" {
+		t.Fatalf("Active = %q, want a2dp-sink", profs.Active)
+	}
+	if _, err := ParseProfiles(data, "11:22:33:44:55:66"); err == nil {
+		t.Fatal("want error for missing card")
+	}
+}
+
+// TestParseProfilesHSPOnly 覆盖真实故障现场（2026-09-21 09:48 实测）：
+// A2DP transport 失败后卡只剩 HSP/HFP，此时 connect 仍报成功但音频是 mono 16kHz。
+func TestParseProfilesHSPOnly(t *testing.T) {
+	data, err := os.ReadFile("testdata/cards_hsp_only.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	profs, err := ParseProfiles(data, "30:96:10:FD:B6:88")
+	if err != nil {
+		t.Fatalf("ParseProfiles: %v", err)
+	}
+	if profs.Has("a2dp-sink") {
+		t.Fatal("degraded fixture must not offer a2dp-sink")
+	}
+	if profs.Active != "headset-head-unit" {
+		t.Fatalf("Active = %q, want headset-head-unit", profs.Active)
+	}
+	if IsA2DP(profs.Active) {
+		t.Fatal("headset-head-unit must not classify as A2DP")
+	}
+}
+
+// TestParseProfilesSkipsUnavailable A2DP profile 存在但 available: no 时不可选。
+func TestParseProfilesSkipsUnavailable(t *testing.T) {
+	data := []byte("Card #1\n\t\tdevice.name = \"bluez_card.30_96_10_FD_B6_88\"\n" +
+		"\t\ta2dp-sink: High Fidelity Playback (A2DP Sink, codec AAC) (sinks: 1, sources: 0, priority: 19, available: no)\n" +
+		"\t\theadset-head-unit: Headset Head Unit (HSP/HFP, codec mSBC) (sinks: 1, sources: 1, priority: 3, available: yes)\n" +
+		"\tActive Profile: headset-head-unit\n")
+	profs, err := ParseProfiles(data, "30:96:10:FD:B6:88")
+	if err != nil {
+		t.Fatalf("ParseProfiles: %v", err)
+	}
+	if profs.Has("a2dp-sink") {
+		t.Fatal("available: no profile must not be selectable")
+	}
+	if _, ok := PickA2DPProfile(profs.Available); ok {
+		t.Fatal("PickA2DPProfile must fail when only unavailable A2DP exists")
+	}
+}
+
+// TestPickA2DPProfile 优先选 AAC 的 a2dp-sink（priority 最高），回落 SBC。
+func TestPickA2DPProfile(t *testing.T) {
+	got, ok := PickA2DPProfile([]string{"off", "headset-head-unit", "a2dp-sink-sbc", "a2dp-sink"})
+	if !ok || got != "a2dp-sink" {
+		t.Fatalf("PickA2DPProfile = %q ok=%v, want a2dp-sink", got, ok)
+	}
+	got, ok = PickA2DPProfile([]string{"off", "headset-head-unit", "a2dp-sink-sbc_xq"})
+	if !ok || got != "a2dp-sink-sbc_xq" {
+		t.Fatalf("PickA2DPProfile = %q ok=%v, want a2dp-sink-sbc_xq", got, ok)
+	}
+	if _, ok := PickA2DPProfile([]string{"off", "headset-head-unit"}); ok {
+		t.Fatal("want not found when no A2DP available")
+	}
+	if _, ok := PickA2DPProfile(nil); ok {
+		t.Fatal("want not found on empty input")
+	}
+}

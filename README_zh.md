@@ -8,6 +8,7 @@ Linux 蓝牙耳机一键连接 + 音频输出自动切换工具（bluez + PipeWi
 
 1. **连上了但声音还是从扬声器出**——`bluetoothctl connect` 不会切换 PulseAudio/PipeWire 默认输出。blue-select 等待蓝牙 sink 就绪后自动设为默认输出，并把已有播放流全部迁移过去。
 2. **睡眠唤醒后要手动重连**——一条命令：`blue-select connect`。
+3. **连上了但声音是单声道、音质差**——A2DP 传输失败后 bluez 会回落到 HSP/HFP 通话档（`headset-head-unit`，mono 16kHz），但设备仍显示已连接。blue-select 会校验当前音频档位并切回 A2DP；若卡上 A2DP 档已整个消失，则自动断连重连一次让 bluez 重新协商。
 
 ```bash
 # 连接设备（名字模糊匹配）并切换音频输出
@@ -16,7 +17,7 @@ blue-select connect freearc
 # 断开设备；默认输出自动切回本地 sink
 blue-select disconnect freearc
 
-# 显示设备、电量、A2DP profile、sink 列表与默认输出
+# 显示设备、电量、音频档位（非 A2DP 会告警）、sink 列表与默认输出
 blue-select status
 
 # 守护模式：监听新蓝牙 sink，自动切换默认输出
@@ -61,7 +62,7 @@ go test ./...
 ## 已知限制
 
 - 耳机正连着手机时可能拒绝电脑连接（不广播/连接竞态），先在手机端断开。
-- `watch` 只负责音频路由切换，不负责重连耳机；重连依赖 bluetoothd 对 trusted 设备的自动回连。
+- `watch` 只负责音频路由切换，不负责重连耳机，也不校验音频档位；重连依赖 bluetoothd 对 trusted 设备的自动回连。
 - 仅提供非交互子命令，无 TUI。
 
 ## 故障排查
@@ -84,6 +85,10 @@ Intel 蓝牙适配器的 USB 自动挂起会导致此问题（内核日志：`hc
 ```bash
 sudo bash ~/Downloads/fix-bluetooth-usb-autosuspend.sh
 ```
+
+**连上了，但声音是单声道、音质差（走 HSP/HFP 而非 A2DP）**
+
+A2DP 传输失败后，bluez 会回落到 HSP/HFP 通话档（`headset-head-unit`，mono 16kHz），但设备仍显示已连接。`blue-select status` 会把它标为 `⚠ 非 A2DP`。重跑 `blue-select connect`：工具会把卡切回 `a2dp-sink`；若该档位已整个消失，则自动断连重连一次让 bluez 重新协商 A2DP。若档位仍不恢复，检查耳机是否被手机等其他主机占用、电量是否充足。
 
 ## 许可证
 

@@ -138,6 +138,17 @@ func runConnect(name string) error {
 	if err != nil {
 		return fmt.Errorf("%w（设备可能连上了但音频链路未就绪，检查手机端是否抢占）", err)
 	}
+
+	// 校验音频档位。bluez 在 A2DP transport 失败后会回落到 HSP/HFP（mono 16kHz），
+	// 此时“已连接”是假成功——必须修正或如实报告。
+	profile, note := ensurePlaybackProfile(mac)
+	if note != "" {
+		fmt.Println("  " + note)
+		if s, err := audio.WaitBluez(10 * time.Second); err == nil {
+			sink = s // 档位切换/重连可能换 sink 名
+		}
+	}
+
 	if cur, _ := audio.Default(); cur != sink.Name {
 		if err := audio.SetDefault(sink.Name); err != nil {
 			return err
@@ -155,11 +166,75 @@ func runConnect(name string) error {
 	}
 
 	info, _ = bluetooth.Info_(mac)
-	fmt.Printf("✓ %s 已连接，输出已切换到 %s（迁移 %d 个播放流）\n", devName, sink.Name, moved)
+	if profile != "" && !audio.IsA2DP(profile) {
+		fmt.Fprintf(os.Stderr, "⚠ %s 已连接，但音频档位为 %s（非 A2DP，单声道低音质）\n", devName, profile)
+		fmt.Fprintf(os.Stderr, "  输出已切到 %s。检查耳机是否被手机占用，然后重跑本命令。\n", sink.Name)
+	} else {
+		fmt.Printf("✓ %s 已连接，输出已切换到 %s（迁移 %d 个播放流）\n", devName, sink.Name, moved)
+	}
 	if info.HasBattery {
 		fmt.Printf("  电量: %d%%\n", info.Battery)
 	}
 	return nil
+}
+
+// ensurePlaybackProfile 确保设备处于 A2DP 播放档，返回最终档位与处理说明。
+// 说明为空表示无需处理（已是 A2DP，或档位查不到时不冒险改动）。
+//
+// 恢复链：
+//  1. 卡上仍有 A2DP 档 → 直接切过去
+//  2. A2DP 档整个消失 → 断连重连一次，让 bluez 重新协商
+//
+// 2 为本机 2026-09-21 实测有效的手段：A2DP transport 失败后卡只剩 HSP/HFP，
+// 单切 profile 报 "No such entity"，断连重连后 a2dp-sink 重新出现。
+func ensurePlaybackProfile(mac string) (string, string) {
+	profs, err := waitProfiles(mac)
+	if err != nil {
+		return "", ""
+	}
+	if audio.IsA2DP(profs.Active) {
+		return profs.Active, ""
+	}
+	if target, ok := audio.PickA2DPProfile(profs.Available); ok {
+		if err := audio.SetCardProfile(mac, target); err == nil {
+			if after, err := audio.Profiles(mac); err == nil && audio.IsA2DP(after.Active) {
+				return after.Active, fmt.Sprintf("音频档位 %s → %s", profs.Active, after.Active)
+			}
+		}
+	}
+	// A2DP 档不可用：断连重连重新协商
+	if err := bluetooth.Disconnect(mac); err != nil {
+		return profs.Active, ""
+	}
+	time.Sleep(2 * time.Second)
+	if err := bluetooth.Connect(mac); err != nil {
+		return profs.Active, ""
+	}
+	if _, err := audio.WaitBluez(15 * time.Second); err != nil {
+		return profs.Active, ""
+	}
+	after, err := waitProfiles(mac)
+	if err != nil {
+		return profs.Active, ""
+	}
+	if audio.IsA2DP(after.Active) {
+		return after.Active, fmt.Sprintf("音频档位 %s → %s（断连重连恢复）", profs.Active, after.Active)
+	}
+	return after.Active, fmt.Sprintf("音频档位 %s（断连重连未能恢复 A2DP）", after.Active)
+}
+
+// waitProfiles 读蓝牙卡档位；卡刚建立时偶发查不到，重试几次。
+func waitProfiles(mac string) (audio.CardProfiles, error) {
+	var lastErr error
+	for i := 0; i < 3; i++ {
+		p, err := audio.Profiles(mac)
+		if err == nil {
+			return p, nil
+		}
+		lastErr = err
+		time.Sleep(time.Second)
+	}
+	return audio.CardProfiles{}, lastErr
 }
 
 // runDisconnect 断开设备。若默认输出是该设备的 bluez sink，先把音频迁到回退 sink，
@@ -266,7 +341,11 @@ func runStatus() error {
 		fmt.Println(line)
 		if info.Connected {
 			if p, err := audio.ActiveProfile(d.MAC); err == nil {
-				fmt.Printf("    profile: %s\n", p)
+				line := fmt.Sprintf("    profile: %s", p)
+				if !audio.IsA2DP(p) {
+					line += "  ⚠ 非 A2DP（单声道低音质）"
+				}
+				fmt.Println(line)
 			}
 		}
 	}
