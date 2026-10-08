@@ -14,6 +14,9 @@ Bluetooth headphone one-shot connect & audio switch for Linux (bluez + PipeWire/
 # Connect device (fuzzy name match) and switch audio output
 blue-select connect freearc
 
+# Connect device and switch to HFP profile (microphone input)
+blue-select connect-mic freearc
+
 # Re-pair a device (drops the old record, answers the passkey prompt, then connects)
 blue-select pair freearc
 
@@ -67,6 +70,7 @@ go test ./...
 - If the headphone is currently connected to your phone, it may refuse the computer connection (no broadcasting / connection race). Disconnect it on the phone first.
 - `watch` switches audio routing and repairs the audio profile with a low-risk `set-card-profile` only; it never reconnects the headset. Reconnection relies on bluetoothd auto-reconnect for trusted devices.
 - Non-interactive subcommands only; no TUI.
+- `connect-mic` switches to HFP/HSP profile (mono 16 kHz) for microphone input; use `connect` to switch back to A2DP for music playback.
 
 ## Troubleshooting
 

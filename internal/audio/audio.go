@@ -310,3 +310,154 @@ func PickA2DPProfile(profiles []string) (string, bool) {
 	}
 	return "", false
 }
+
+// IsHFP 判断档位是否为 HFP/HSP 通话档（支持麦克风输入）。
+// HFP/HSP 档位提供双向音频：单声道扬声器 + 麦克风。
+func IsHFP(profile string) bool {
+	return strings.HasPrefix(profile, "headset-head-unit")
+}
+
+// PickHFPProfile 从可用档位中挑优先级最高的 HFP 档。
+// 优先级：headset-head-unit(mSBC) > headset-head-unit-cvsd(CVSD) > 其他 headset-head-unit*。
+// mSBC 音质优于 CVSD，故优先。
+// 无 HFP 档时返回 false。
+func PickHFPProfile(profiles []string) (string, bool) {
+	for _, want := range []string{"headset-head-unit", "headset-head-unit-cvsd"} {
+		for _, p := range profiles {
+			if p == want {
+				return p, true
+			}
+		}
+	}
+	for _, p := range profiles {
+		if IsHFP(p) {
+			return p, true
+		}
+	}
+	return "", false
+}
+
+// Source 是 `pactl list sources short` 的一行。
+type Source struct {
+	ID    string // 首列编号
+	Name  string
+	State string
+}
+
+// ParseSources 解析 `pactl list sources short`。行格式: ID\tName\tDriver\tSpec\tState
+// （与 sinks 格式相同）
+func ParseSources(data []byte) ([]Source, error) {
+	var sources []Source
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimRight(line, "\r")
+		if line == "" {
+			continue
+		}
+		f := strings.Split(line, "\t")
+		if len(f) < 5 {
+			continue
+		}
+		sources = append(sources, Source{ID: f[0], Name: f[1], State: f[4]})
+	}
+	if len(sources) == 0 {
+		return nil, fmt.Errorf("pactl list sources short: 无 source 或输出无法解析")
+	}
+	return sources, nil
+}
+
+// Sources 返回当前所有 source。
+func Sources() ([]Source, error) {
+	out, err := pactl("10", "list", "sources", "short")
+	if err != nil {
+		return nil, err
+	}
+	return ParseSources(out)
+}
+
+// BluezSource 返回第一个 bluez_input source（蓝牙麦克风）。
+func BluezSource() (Source, bool) {
+	sources, err := Sources()
+	if err != nil {
+		return Source{}, false
+	}
+	for _, s := range sources {
+		if strings.HasPrefix(s.Name, "bluez_input.") {
+			return s, true
+		}
+	}
+	return Source{}, false
+}
+
+// BluezSourcePrefix 返回指定设备 MAC 的所有 source 名公共前缀（冒号换下划线）。
+// 同一设备的 HFP profile 会产生多个 source，用前缀一并匹配。
+func BluezSourcePrefix(mac string) string {
+	return "bluez_input." + strings.ReplaceAll(mac, ":", "_") + "."
+}
+
+// SourceMAC 从 bluez source 名反解设备 MAC。
+// "bluez_input.30_96_10_FD_B6_88.1" → "30:96:10:FD:B6:88"
+// 非 bluez source 或形状不符时返回 false。
+func SourceMAC(sourceName string) (string, bool) {
+	rest, ok := strings.CutPrefix(sourceName, "bluez_input.")
+	if !ok {
+		return "", false
+	}
+	// 去掉尾部 profile 序号（.1 / .2 …）
+	if i := strings.LastIndex(rest, "."); i > 0 {
+		rest = rest[:i]
+	}
+	mac := strings.ReplaceAll(rest, "_", ":")
+	// 形如 30:96:10:FD:B6:88，共 17 字符
+	if len(mac) != 17 {
+		return "", false
+	}
+	return mac, true
+}
+
+// DefaultSource 返回默认 source 名。
+func DefaultSource() (string, error) {
+	out, err := pactl("10", "get-default-source")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(string(out)), nil
+}
+
+// SetDefaultSource 设默认输入。
+func SetDefaultSource(name string) error {
+	_, err := pactl("10", "set-default-source", name)
+	return err
+}
+
+// MoveAllStreamsToSource 把所有录制流迁到指定 source，返回迁移数。
+func MoveAllStreamsToSource(sourceName string) (int, error) {
+	out, err := pactl("10", "list", "source-outputs", "short")
+	if err != nil {
+		return 0, err
+	}
+	moved := 0
+	for _, line := range strings.Split(string(out), "\n") {
+		f := strings.Split(strings.TrimRight(line, "\r"), "\t")
+		if len(f) < 1 || f[0] == "" {
+			continue
+		}
+		if _, err := pactl("10", "move-source-output", f[0], sourceName); err == nil {
+			moved++
+		}
+	}
+	return moved, nil
+}
+
+// WaitBluezSource 轮询等待 bluez source 出现，500ms 间隔，超时返回错误。
+func WaitBluezSource(timeout time.Duration) (Source, error) {
+	deadline := time.Now().Add(timeout)
+	for {
+		if s, ok := BluezSource(); ok {
+			return s, nil
+		}
+		if time.Now().After(deadline) {
+			return Source{}, fmt.Errorf("等待蓝牙 source 超时（%v）", timeout)
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+}

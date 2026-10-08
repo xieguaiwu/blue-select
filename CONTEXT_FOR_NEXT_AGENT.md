@@ -1,7 +1,9 @@
 # CONTEXT_FOR_NEXT_AGENT.md
 
 ## 项目当前状态
-blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（connect / pair / disconnect / status / watch / install 六个子命令）。**开发完成 + 真机端到端验证通过（2026-09-16 / 2026-09-21）：connect 0.12–1.74s exit 0、disconnect 2.87s exit 0、watch 自动切换有日志证据、单测全绿（4 包）、go vet 干净、已部署 `~/.local/bin/blue-select`、blue-select-watch 服务 active。** USB 自动挂起永久修复已由用户执行并验证到位（udev 规则在位，`power/control=on` / `runtime=active`）。
+blue-select — Go CLI，蓝牙耳机一键连接 + 音频输出自动切换（connect / connect-mic / pair / disconnect / status / watch / install 七个子命令）。**开发完成 + 真机端到端验证通过（2026-09-16 / 2026-09-21）：connect 0.12–1.74s exit 0、disconnect 2.87s exit 0、watch 自动切换有日志证据、单测全绿（4 包）、go vet 干净、已部署 `~/.local/bin/blue-select`、blue-select-watch 服务 active。** USB 自动挂起永久修复已由用户执行并验证到位（udev 规则在位，`power/control=on` / `runtime=active`）。
+
+**2026-10-08 新增 `connect-mic` 子命令**：切换到 HFP/HSP 档位以启用麦克风输入（单声道 16kHz，适合通话/录音）。新增 source 管理（`internal/audio` 包：`Source` / `ParseSources` / `Sources` / `BluezSource` / `BluezSourcePrefix` / `SourceMAC` / `DefaultSource` / `SetDefaultSource` / `MoveAllStreamsToSource` / `WaitBluezSource` / `IsHFP` / `PickHFPProfile`）+ 6 个新单测。
 
 ## 最后一次完成的工作（2026-09-21）
 修复「连上了但音频是单声道」的假成功——`runConnect` 只调 `WaitBluez()`（仅确认 bluez sink **存在**），从不校验 **Active Profile**。

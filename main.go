@@ -29,6 +29,12 @@ func main() {
 			name = os.Args[2]
 		}
 		err = runConnect(name)
+	case "connect-mic":
+		name := ""
+		if len(os.Args) > 2 {
+			name = os.Args[2]
+		}
+		err = runConnectMic(name)
 	case "pair":
 		name := ""
 		scanTimeout := 90 * time.Second
@@ -74,6 +80,7 @@ func usage() {
 
 用法:
   blue-select connect [设备名]      连接设备并切换音频输出（无参用默认设备）
+  blue-select connect-mic [设备名]  连接设备并切换到 HFP 档位（麦克风输入）
   blue-select pair [设备名]         重新配对设备（自动删旧记录、应答 passkey 并连接）
                                     可选 --scan-timeout=<秒> 调整扫描窗口（默认 90）
   blue-select disconnect [设备名]   断开设备，默认输出切回本地（无参用默认设备）
@@ -194,6 +201,93 @@ func runConnect(name string) error {
 	if info.HasBattery {
 		fmt.Printf("  电量: %d%%\n", info.Battery)
 	}
+	return nil
+}
+
+// runConnectMic 连接设备并切换到 HFP 档位（麦克风输入）。
+// HFP/HSP 提供双向音频：单声道扬声器 + 麦克风。
+// 流程：连接 → 等待 bluez source → 切 HFP 档位 → 设默认输入源。
+func runConnectMic(name string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return err
+	}
+	devs, err := bluetooth.ListDevices()
+	if err != nil {
+		return err
+	}
+	mac, err := ResolveDevice(cfg, name, devs)
+	if err != nil {
+		return err
+	}
+	devName := name
+	for _, d := range devs {
+		if d.MAC == mac {
+			devName = d.Name
+		}
+	}
+
+	info, err := bluetooth.Info_(mac)
+	if err != nil {
+		return err
+	}
+	if !info.Connected {
+		fmt.Printf("连接 %s (%s)...\n", devName, mac)
+		if err := bluetooth.Connect(mac); err != nil {
+			return err
+		}
+	}
+
+	// 等待 bluez source 出现（HFP 档位注册麦克风）
+	source, err := audio.WaitBluezSource(15 * time.Second)
+	if err != nil {
+		return fmt.Errorf("%w（设备可能连上了但麦克风链路未就绪）", err)
+	}
+
+	// 校验并切换到 HFP 档位
+	profs, err := audio.Profiles(mac)
+	if err != nil {
+		return fmt.Errorf("查询档位失败: %w", err)
+	}
+	if !audio.IsHFP(profs.Active) {
+		if target, ok := audio.PickHFPProfile(profs.Available); ok {
+			if err := audio.SetCardProfile(mac, target); err != nil {
+				return fmt.Errorf("切换到 HFP 档位失败: %w", err)
+			}
+			// 等待 source 按新档位重建
+			time.Sleep(500 * time.Millisecond)
+			if s, ok := audio.BluezSource(); ok {
+				source = s
+			}
+			fmt.Printf("音频档位 %s → %s\n", profs.Active, target)
+		} else {
+			return fmt.Errorf("无可用 HFP 档位（当前: %s，可用: %v）", profs.Active, profs.Available)
+		}
+	}
+
+	// 设默认输入源
+	if cur, _ := audio.DefaultSource(); cur != source.Name {
+		if err := audio.SetDefaultSource(source.Name); err != nil {
+			return err
+		}
+	}
+	moved, _ := audio.MoveAllStreamsToSource(source.Name)
+
+	// 首次连接记录 + 设默认
+	if _, ok := cfg.Devices[devName]; !ok || cfg.DefaultDevice != devName {
+		cfg.Devices[devName] = mac
+		cfg.DefaultDevice = devName
+		if err := config.Save(cfg); err != nil {
+			fmt.Fprintln(os.Stderr, "警告: 配置保存失败:", err)
+		}
+	}
+
+	info, _ = bluetooth.Info_(mac)
+	fmt.Printf("✓ %s 已连接，麦克风已切换到 %s（迁移 %d 个录制流）\n", devName, source.Name, moved)
+	if info.HasBattery {
+		fmt.Printf("  电量: %d%%\n", info.Battery)
+	}
+	fmt.Printf("  注意: HFP 档位为单声道低音质，适合通话/录音，不适合音乐播放\n")
 	return nil
 }
 

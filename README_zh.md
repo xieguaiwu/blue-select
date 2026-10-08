@@ -14,6 +14,9 @@ Linux 蓝牙耳机一键连接 + 音频输出自动切换工具（bluez + PipeWi
 # 连接设备（名字模糊匹配）并切换音频输出
 blue-select connect freearc
 
+# 连接设备并切换到 HFP 档位（麦克风输入）
+blue-select connect-mic freearc
+
 # 重新配对设备（删旧记录、自动应答 passkey，然后连接）
 blue-select pair freearc
 
@@ -67,6 +70,7 @@ go test ./...
 - 耳机正连着手机时可能拒绝电脑连接（不广播/连接竞态），先在手机端断开。
 - `watch` 负责音频路由切换，并只用低风险的 `set-card-profile` 修复音频档位；它不会重连耳机。重连依赖 bluetoothd 对 trusted 设备的自动回连。
 - 仅提供非交互子命令，无 TUI。
+- `connect-mic` 会切换到 HFP/HSP 档位（mono 16 kHz）以启用麦克风输入；需要音乐播放时用 `connect` 切回 A2DP。
 
 ## 故障排查
 

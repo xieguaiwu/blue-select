@@ -233,3 +233,81 @@ func TestPickA2DPProfile(t *testing.T) {
 		t.Fatal("want not found on empty input")
 	}
 }
+
+// TestIsHFP 验证 HFP/HSP 档位识别。
+func TestIsHFP(t *testing.T) {
+	for _, p := range []string{"headset-head-unit", "headset-head-unit-cvsd"} {
+		if !IsHFP(p) {
+			t.Errorf("IsHFP(%q) = false, want true", p)
+		}
+	}
+	for _, p := range []string{"a2dp-sink", "a2dp-sink-sbc", "off", ""} {
+		if IsHFP(p) {
+			t.Errorf("IsHFP(%q) = true, want false", p)
+		}
+	}
+}
+
+// TestPickHFPProfile 优先选 mSBC 的 headset-head-unit（音质优于 CVSD）。
+func TestPickHFPProfile(t *testing.T) {
+	got, ok := PickHFPProfile([]string{"off", "a2dp-sink", "headset-head-unit-cvsd", "headset-head-unit"})
+	if !ok || got != "headset-head-unit" {
+		t.Fatalf("PickHFPProfile = %q ok=%v, want headset-head-unit", got, ok)
+	}
+	got, ok = PickHFPProfile([]string{"off", "a2dp-sink", "headset-head-unit-cvsd"})
+	if !ok || got != "headset-head-unit-cvsd" {
+		t.Fatalf("PickHFPProfile = %q ok=%v, want headset-head-unit-cvsd", got, ok)
+	}
+	if _, ok := PickHFPProfile([]string{"off", "a2dp-sink"}); ok {
+		t.Fatal("want not found when no HFP available")
+	}
+	if _, ok := PickHFPProfile(nil); ok {
+		t.Fatal("want not found on empty input")
+	}
+}
+
+// TestParseSources 验证 source 解析。
+func TestParseSources(t *testing.T) {
+	data := []byte("57\talsa_output.pci-0000_00_1f.3.analog-stereo.monitor\tPipeWire\ts32le 2ch 48000Hz\tRUNNING\n" +
+		"58\talsa_input.pci-0000_00_1f.3.analog-stereo\tPipeWire\ts32le 2ch 48000Hz\tRUNNING\n" +
+		"59\tbluez_input.30_96_10_FD_B6_88.1\tPipeWire\ts16le 1ch 16000Hz\tIDLE\n")
+	sources, err := ParseSources(data)
+	if err != nil {
+		t.Fatalf("ParseSources: %v", err)
+	}
+	if len(sources) != 3 {
+		t.Fatalf("want 3 sources, got %d", len(sources))
+	}
+	bt := sources[2]
+	if bt.Name != "bluez_input.30_96_10_FD_B6_88.1" || bt.State != "IDLE" || bt.ID != "59" {
+		t.Fatalf("bt source = %+v", bt)
+	}
+}
+
+// TestBluezSourcePrefix 验证 source 前缀生成。
+func TestBluezSourcePrefix(t *testing.T) {
+	if got := BluezSourcePrefix("30:96:10:FD:B6:88"); got != "bluez_input.30_96_10_FD_B6_88." {
+		t.Fatalf("prefix = %q", got)
+	}
+}
+
+// TestSourceMAC 验证从 source 名反解 MAC。
+func TestSourceMAC(t *testing.T) {
+	mac, ok := SourceMAC("bluez_input.30_96_10_FD_B6_88.1")
+	if !ok || mac != "30:96:10:FD:B6:88" {
+		t.Fatalf("SourceMAC = %q ok=%v", mac, ok)
+	}
+	// 与 BluezSourcePrefix 往返一致
+	if got := BluezSourcePrefix(mac); !strings.HasPrefix("bluez_input.30_96_10_FD_B6_88.1", got) {
+		t.Fatalf("roundtrip mismatch: prefix %q", got)
+	}
+	for _, bad := range []string{
+		"alsa_input.pci-0000_00_1f.3.analog-stereo",
+		"bluez_input.short",
+		"",
+	} {
+		if _, ok := SourceMAC(bad); ok {
+			t.Errorf("SourceMAC(%q) = ok, want false", bad)
+		}
+	}
+}
